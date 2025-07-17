@@ -94,6 +94,7 @@ class BasicBlock(nn.Cell):
             self.down_sample_layer = _conv2d(in_channels, out_channels, 1, stride=stride)
     
     def construct(self, x):
+        print(f"[DEBUG] BasicBlock输入 - 形状: {x.shape}, 数据类型: {x.dtype}")
         identity = x
         
         x = self.conv1(x)
@@ -104,11 +105,23 @@ class BasicBlock(nn.Cell):
         x = self.bn2(x)
         
         if self.downsample:
+            print(f"[DEBUG] 执行下采样 - identity形状: {identity.shape}")
             identity = self.down_sample_layer(identity)
+            print(f"[DEBUG] 下采样后 - identity形状: {identity.shape}")
+        
+        # 检查相加前的数据类型和形状
+        print(f"[DEBUG] 相加前 - x: {x.shape}, {x.dtype}, identity: {identity.shape}, {identity.dtype}")
+        
+        # 确保数据类型一致
+        if x.dtype != identity.dtype:
+            print(f"[WARNING] 数据类型不匹配，统一为float32")
+            x = ops.cast(x, ms.float32)
+            identity = ops.cast(identity, ms.float32)
         
         out = ops.add(x, identity)
         out = self.relu(out)
         
+        print(f"[DEBUG] BasicBlock输出 - 形状: {out.shape}, 数据类型: {out.dtype}")
         return out
 
 # ResNet网络
@@ -163,15 +176,42 @@ class ResNet(nn.Cell):
         return nn.SequentialCell(layers)
     
     def construct(self, x):
+        # 添加输入调试信息
+        print(f"[DEBUG] ResNet输入 - 形状: {x.shape}, 数据类型: {x.dtype}")
+        
+        # 检查输入是否包含异常值
+        if ops.isnan(x).any():
+            print("[ERROR] 输入包含NaN值!")
+        if ops.isinf(x).any():
+            print("[ERROR] 输入包含Inf值!")
+        
+        # 确保输入数据类型为float32
+        if x.dtype != ms.float32:
+            print(f"[WARNING] 输入数据类型为{x.dtype}，转换为float32")
+            x = ops.cast(x, ms.float32)
+        
+        print(f"[DEBUG] conv1前 - 形状: {x.shape}, 数据类型: {x.dtype}")
         x = self.conv1(x)
+        print(f"[DEBUG] conv1后 - 形状: {x.shape}, 数据类型: {x.dtype}")
+        
         x = self.bn1(x)
+        print(f"[DEBUG] bn1后 - 形状: {x.shape}, 数据类型: {x.dtype}")
+        
         x = self.relu(x)
         c1 = self.maxpool(x)
+        print(f"[DEBUG] maxpool后 - 形状: {c1.shape}, 数据类型: {c1.dtype}")
         
         c2 = self.layer1(c1)
+        print(f"[DEBUG] layer1后 - 形状: {c2.shape}, 数据类型: {c2.dtype}")
+        
         c3 = self.layer2(c2)
+        print(f"[DEBUG] layer2后 - 形状: {c3.shape}, 数据类型: {c3.dtype}")
+        
         c4 = self.layer3(c3)
+        print(f"[DEBUG] layer3后 - 形状: {c4.shape}, 数据类型: {c4.dtype}")
+        
         c5 = self.layer4(c4)
+        print(f"[DEBUG] layer4后 - 形状: {c5.shape}, 数据类型: {c5.dtype}")
         
         out = c5
         if self.num_classes:
@@ -179,6 +219,7 @@ class ResNet(nn.Cell):
             out = self.squeeze(out)
             out = self.end_point(out)
         
+        print(f"[DEBUG] ResNet输出 - c3: {c3.shape}, c4: {c4.shape}, out: {out.shape}")
         return c3, c4, out
 
 def resnet18(class_num=10):
